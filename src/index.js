@@ -6,6 +6,10 @@ import mongoose from "mongoose";
 
 const app = express();
 
+let correctAnswers = [];
+let startTime;
+let duration;
+
 main().catch((err) => console.log(err));
 async function main() {
   await mongoose.connect(process.env.MONGO);
@@ -13,7 +17,7 @@ async function main() {
 
 const leaderBoardSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  time: { type: Number, default: timeValue },
+  time: { type: Number, default: duration },
   date: { type: Date, default: Date.now },
 });
 
@@ -22,7 +26,13 @@ const LeaderBoard = mongoose.model("leaderBoard", leaderBoardSchema);
 app.use(cors());
 app.use(bodyParser.json());
 
-let correctAnswers = [];
+app.get("/start-time", (req, res) => {
+  if (startTime) {
+    res.status(400).json({ message: "Time already started" });
+  }
+  startTime = Date.now();
+  res.status(200).json({ message: "time started" });
+});
 
 app.get("/leaderboard", async (req, res) => {
   try {
@@ -38,7 +48,7 @@ app.post("/form", async (req, res) => {
   try {
     const newScore = new LeaderBoard({
       name: name,
-      time: timeValue,
+      time: duration,
     });
     await newScore.save();
     res.status(200).json({ message: "Saved" });
@@ -48,12 +58,7 @@ app.post("/form", async (req, res) => {
   }
 });
 
-app.get("/time", (req, res) => {
-  res.json({ time: timeValue });
-});
-
 app.post("/answers", (req, res) => {
-  startTimer();
   const answer = req.body.answer;
   if (!correctAnswers.includes(answer)) {
     correctAnswers.push(answer);
@@ -65,8 +70,9 @@ app.post("/answers", (req, res) => {
 app.get("/game-completed", (req, res) => {
   if (correctAnswers.length >= 3) {
     correctAnswers = [];
-    stopTimer();
-    timeValue = 0;
+    const currentTime = new Date();
+    duration = Math.floor((currentTime - startTime) / 1000);
+    startTime = null;
     res.status(200).json({ completed: true, message: "gamedone" });
   } else {
     res.status(200).json({ completed: false, message: "not yeat" });
